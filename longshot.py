@@ -315,24 +315,27 @@ def format_odds(prob):
 def clear():
     print("\033[2J\033[H", end="")
 
-def box_top(width=56):
-    return f"{ORANGE}╔{'═' * width}╗{RST}"
+def strip_ansi(s):
+    """Remove ANSI escape sequences to get visible length."""
+    import re
+    return re.sub(r'\033\[[0-9;]*m', '', str(s))
 
-def box_bottom(width=56):
-    return f"{ORANGE}╚{'═' * width}╝{RST}"
+def pad_visible(text, width, align='left'):
+    """Pad text accounting for ANSI codes."""
+    visible = strip_ansi(text)
+    padding = max(0, width - len(visible))
+    if align == 'right':
+        return ' ' * padding + text
+    return text + ' ' * padding
 
-def box_line(text, width=56, color=RST):
-    pad = width - len(text.replace('\033[0m','').replace('\033[1m','').replace('\033[2m','').replace('\033[38;5;214m','').replace('\033[33m','').replace('\033[32m','').replace('\033[31m','').replace('\033[36m','').replace('\033[97m','').replace('\033[90m',''))
-    return f"{ORANGE}║{RST}{text}{' ' * max(0, pad)}{ORANGE}║{RST}"
-
-def mini_card(title, value, sub="", accent_color=ORANGE, width=26):
-    """Render a small stat card like the web demo."""
-    lines = []
-    lines.append(f"  {GRAY}{title}{RST}")
-    lines.append(f"  {accent_color}{BLD}{value}{RST}")
-    if sub:
-        lines.append(f"  {DIM}{sub}{RST}")
-    return lines
+def draw_card_row(left_title, left_val, left_sub, right_title, right_val, right_sub, left_color=ORANGE, w=26):
+    """Draw a row of two stat cards with perfect alignment."""
+    top = f"  {ORANGE}┌{'─' * w}┐  ┌{'─' * w}┐{RST}"
+    t1 = f"  {ORANGE}│{RST} {GRAY}{pad_visible(left_title, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {GRAY}{pad_visible(right_title, w-2)}{RST}{ORANGE}│{RST}"
+    v1 = f"  {ORANGE}│{RST} {left_color}{BLD}{pad_visible(left_val, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {WHT}{pad_visible(right_val, w-2)}{RST}{ORANGE}│{RST}"
+    s1 = f"  {ORANGE}│{RST} {DIM}{pad_visible(left_sub, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {DIM}{pad_visible(right_sub, w-2)}{RST}{ORANGE}│{RST}"
+    bot = f"  {ORANGE}└{'─' * w}┘  └{'─' * w}┘{RST}"
+    return f"\n{top}\n{t1}\n{v1}\n{s1}\n{bot}"
 
 def print_dashboard(client, elapsed, btc_price=None):
     clear()
@@ -353,17 +356,17 @@ def print_dashboard(client, elapsed, btc_price=None):
 ╚{'═' * 58}╝{RST}""")
 
     # ═══ STATS GRID (4 cards) ═══
-    print(f"""
-  {ORANGE}┌{'─' * 26}┐  ┌{'─' * 26}┐{RST}
-  {ORANGE}│{RST} {GRAY}HASHRATE{RST}               {ORANGE}│{RST}  {ORANGE}│{RST} {GRAY}TOTAL HASHES{RST}          {ORANGE}│{RST}
-  {ORANGE}│{RST} {ORANGE}{BLD}{format_hashrate(hr):<24}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {WHT}{client.submitted:>24,}{RST} {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}SHA-256d on CPU{RST}        {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}lottery tickets{RST}        {ORANGE}│{RST}
-  {ORANGE}└{'─' * 26}┘  └{'─' * 26}┘{RST}
-  {ORANGE}┌{'─' * 26}┐  ┌{'─' * 26}┐{RST}
-  {ORANGE}│{RST} {GRAY}SESSION TIME{RST}           {ORANGE}│{RST}  {ORANGE}│{RST} {GRAY}POWER COST{RST}            {ORANGE}│{RST}
-  {ORANGE}│{RST} {WHT}{str(timedelta(seconds=int(elapsed))):<24}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {WHT}${power_cost:<23.4f}{RST} {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}since start{RST}            {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}est. at $0.12/kWh{RST}     {ORANGE}│{RST}
-  {ORANGE}└{'─' * 26}┘  └{'─' * 26}┘{RST}""")
+    hr_str = format_hashrate(hr)
+    hashes_str = f"{client.submitted:,}"
+    time_str = str(timedelta(seconds=int(elapsed)))
+    cost_str = f"${power_cost:.4f}"
+    
+    print(draw_card_row("HASHRATE", hr_str, "SHA-256d on CPU",
+                        "TOTAL HASHES", hashes_str, "lottery tickets",
+                        left_color=ORANGE))
+    print(draw_card_row("SESSION TIME", time_str, "since start",
+                        "POWER COST", cost_str, "est. at $0.12/kWh",
+                        left_color=WHT))
 
     # ═══ LIVE HASH STREAM ═══
     recent_hashes = getattr(client, 'recent_hashes', [])
