@@ -338,11 +338,11 @@ def draw_full_box(title, lines, w=58):
     out.append(f"  {ORANGE}└{'─' * w}┘{RST}")
     return "\n".join(out)
 
-def draw_odds_row(label, odds_val, label2, val2, w=26):
-    """Single row in the odds/prize cards."""
-    left = f"  {ORANGE}│{RST} {DIM}{pad_visible(label, 10)}{RST} {RED}{pad_visible(odds_val, 14, 'right')}{RST}{ORANGE}│{RST}"
-    right = f"  {ORANGE}│{RST} {DIM}{pad_visible(label2, 12)}{RST} {pad_visible(val2, 12, 'right')}{RST}{ORANGE}│{RST}"
-    return f"{left}  {right}"
+def draw_odds_row(label, odds_val, label2, val2):
+    """Single row in the odds/prize cards. Each card is 30 chars total."""
+    left = f"  {ORANGE}│{RST} {DIM}{pad_visible(label, 13)}{RST}{RED}{pad_visible(odds_val, 13, 'right')}{RST} {ORANGE}│{RST}"
+    right = f"  {ORANGE}│{RST} {DIM}{pad_visible(label2, 13)}{RST}{pad_visible(val2, 13, 'right')}{RST} {ORANGE}│{RST}"
+    return f"{left} {right}"
 
 def print_dashboard(client, elapsed, btc_price=None):
     clear()
@@ -395,20 +395,25 @@ def print_dashboard(client, elapsed, btc_price=None):
     
     print(draw_full_box("LIVE HASH STREAM (last 8 hashes)", hash_lines))
 
-    # ═══ ODDS + PRIZE (2-column) ═══
+    # ═══ ODDS + PRIZE (stacked vertically — no alignment issues) ═══
     weekly_odds_val = 1 - (1 - odds) ** (144 * 7)
     monthly_odds_val = 1 - (1 - odds) ** (144 * 30)
     yearly_odds_val = 1 - (1 - odds) ** (144 * 365)
     net_share = (hr / 650_000_000_000_000_000_000) * 100
     
-    print(f"\n  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}🎯 YOUR ODDS{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{BLD}🏆 THE PRIZE{RST}', 24)} {ORANGE}│{RST}")
-    print(draw_odds_row("Per Block", format_odds(odds), "Block Reward", f"{GOLD}{BITCOIN_REWARD} ₿{RST}"))
-    print(draw_odds_row("Per Day", format_odds(daily_odds), "USD Value", f"{WHT}${btc_value:,.0f}{RST}"))
-    print(draw_odds_row("Per Week", format_odds(weekly_odds_val), "Network HR", f"{GRAY}~650 EH/s{RST}"))
-    print(draw_odds_row("Per Month", format_odds(monthly_odds_val), "Your Share", f"{GRAY}{net_share:.2e}%{RST}"))
-    print(draw_odds_row("Per Year", format_odds(yearly_odds_val), "Pool", f"{GRN}{client.host}{RST}"))
-    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
+    odds_lines = [
+        f"{DIM}Per Block:{RST}   {RED}{format_odds(odds)}{RST}      {DIM}Per Day:{RST}   {RED}{format_odds(daily_odds)}{RST}",
+        f"{DIM}Per Week:{RST}    {RED}{format_odds(weekly_odds_val)}{RST}      {DIM}Per Month:{RST}  {RED}{format_odds(monthly_odds_val)}{RST}",
+        f"{DIM}Per Year:{RST}    {RED}{format_odds(yearly_odds_val)}{RST}",
+    ]
+    print(draw_full_box("🎯 YOUR ODDS", odds_lines))
+    
+    prize_lines = [
+        f"{DIM}Block Reward:{RST}  {GOLD}{BITCOIN_REWARD} ₿{RST}     {DIM}USD Value:{RST}  {WHT}${btc_value:,.0f}{RST}",
+        f"{DIM}Network HR:{RST}    {GRAY}~650 EH/s{RST}       {DIM}Your Share:{RST}  {GRAY}{net_share:.2e}%{RST}",
+        f"{DIM}Pool:{RST}          {GRN}{client.host}{RST}",
+    ]
+    print(draw_full_box("🏆 THE PRIZE", prize_lines))
 
     # ═══ ELECTRICITY ═══
     monthly_cost = daily_cost * 30
