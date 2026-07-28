@@ -20,6 +20,7 @@ import struct
 import time
 import random
 import threading
+import subprocess
 import math
 from datetime import datetime, timedelta
 
@@ -65,7 +66,7 @@ def recv_line(sock):
             return buf.decode().strip()
 
 class StratumClient:
-    def __init__(self, host, port, username="longshot", password="x"):
+    def __init__(self, host, port, username="1LongShotDemoBTCAddress111111111", password="x"):
         self.host = host
         self.port = port
         self.username = username
@@ -419,10 +420,24 @@ def run_miner(pool_host=None, pool_port=None):
         for host, port in SOLO_POOLS:
             print(f"  {DIM}Connecting to {host}:{port}...{RST}")
             client = StratumClient(host, port)
-            if client.connect():
+            if not client.connect():
+                print(f"  {RED}Connection failed.{RST}")
+                continue
+            
+            print(f"  {GRN}Connected!{RST}")
+            print(f"  {DIM}Subscribing...{RST}")
+            if not client.subscribe():
+                print(f"  {RED}Subscribe failed.{RST}")
+                client.stop()
+                continue
+            
+            print(f"  {DIM}Authorizing...{RST}")
+            if client.authorize():
                 pool_host, pool_port = host, port
                 break
-            print(f"  {RED}Failed.{RST}")
+            else:
+                print(f"  {YELLOW}Auth failed on {host} — trying next pool...{RST}")
+                client.stop()
         else:
             print(f"  {RED}Could not connect to any pool. Check internet.{RST}")
             return
@@ -431,21 +446,23 @@ def run_miner(pool_host=None, pool_port=None):
         if not client.connect():
             print(f"  {RED}Could not connect to {pool_host}:{pool_port}{RST}")
             return
-
-    print(f"  {GRN}Connected!{RST}")
-    print(f"  {DIM}Subscribing...{RST}")
-
-    if not client.subscribe():
-        print(f"  {RED}Subscribe failed.{RST}")
-        return
-
-    print(f"  {DIM}Authorizing...{RST}")
-    if not client.authorize():
-        print(f"  {RED}Auth failed.{RST}")
-        return
+        if not client.subscribe():
+            print(f"  {RED}Subscribe failed.{RST}")
+            return
+        if not client.authorize():
+            print(f"  {RED}Auth failed.{RST}")
+            return
 
     print(f"  {GRN}Mining started!{RST}")
-    print(f"  {DIM}Each dot = ~500K hashes. Press Ctrl+C to stop.{RST}\n")
+    print(f"  {DIM}Each dot = ~500K hashes. Press Ctrl+C to stop.{RST}")
+    print(f"  {GRN}☕ Caffeinated — your Mac won't sleep while mining.{RST}\n")
+
+    # Start caffeinate to prevent sleep
+    caff = None
+    try:
+        caff = subprocess.Popen(['caffeinate', '-dimsu'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except:
+        pass
 
     # Start mining in a thread
     result_holder = [None]
@@ -484,6 +501,10 @@ def run_miner(pool_host=None, pool_port=None):
         print(f"\n\n  {GOLD}⏹ Mining stopped.{RST}")
     finally:
         client.stop()
+        if caff:
+            caff.terminate()
+            try: caff.wait(timeout=2)
+            except: caff.kill()
 
     # Show result
     result = result_holder[0]
