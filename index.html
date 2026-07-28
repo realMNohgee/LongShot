@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LongShot — Bitcoin Lottery Miner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --card: #13131d;
+    --card-alt: #1a1a28;
+    --border: #222233;
+    --text: #eaeaef;
+    --muted: #7777a0;
+    --orange: #F7931A;
+    --orange-glow: rgba(247,147,26,0.25);
+    --gold: #FFD700;
+    --gold-glow: rgba(255,215,0,0.3);
+    --green: #00c853;
+    --red: #ff3d3d;
+    --radius: 16px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(247,147,26,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(247,147,26,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── Hero ───────────────────────────── */
+  .hero {
+    position: relative; z-index: 1;
+    text-align: center; padding: 80px 24px 60px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 50px; padding: 6px 18px;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    margin-bottom: 24px;
+    backdrop-filter: blur(8px);
+  }
+  .hero-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--orange); box-shadow: 0 0 10px var(--orange-glow);
+  }
+  .hero h1 {
+    font-size: clamp(40px, 8vw, 80px);
+    font-weight: 900; letter-spacing: -2px; line-height: 1;
+    margin-bottom: 16px;
+  }
+  .hero h1 .lot { color: var(--orange); }
+  .hero h1 .shot { color: var(--gold); }
+  .hero p {
+    font-size: 18px; color: var(--muted); max-width: 520px;
+    margin: 0 auto 32px; line-height: 1.5;
+  }
+
+  /* ─── Big Mine Button ────────────────── */
+  .mine-btn-wrap { position: relative; display: inline-block; }
+  .mine-btn {
+    position: relative; z-index: 1;
+    padding: 18px 48px; border-radius: 16px;
+    font-size: 18px; font-weight: 800; font-family: inherit;
+    letter-spacing: -0.3px; cursor: pointer; border: none;
+    background: linear-gradient(135deg, var(--orange), #e67e00);
+    color: #fff; box-shadow: 0 0 40px var(--orange-glow), 0 8px 32px rgba(247,147,26,0.3);
+    transition: all 0.2s;
+  }
+  .mine-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 0 60px var(--orange-glow), 0 12px 40px rgba(247,147,26,0.4);
+  }
+  .mine-btn:active { transform: scale(0.98); }
+  .mine-btn.running {
+    background: linear-gradient(135deg, #333, #222);
+    box-shadow: 0 0 20px rgba(255,255,255,0.1);
+    animation: pulse-btn 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-btn {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,255,255,0.1); }
+    50% { box-shadow: 0 0 40px var(--orange-glow); }
+  }
+  .mine-btn .icon { font-size: 22px; }
+
+  /* ─── Container ───────────────────────── */
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
+
+  /* ─── Stats Cards ────────────────────── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    text-align: center; backdrop-filter: blur(8px);
+    transition: all 0.3s;
+  }
+  .stat-card.highlight {
+    border-color: rgba(247,147,26,0.4);
+    box-shadow: 0 0 24px rgba(247,147,26,0.08);
+  }
+  .stat-card .label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 8px;
+  }
+  .stat-card .value {
+    font-family: 'DM Mono', monospace;
+    font-size: 28px; font-weight: 500; letter-spacing: -1px;
+  }
+  .stat-card .value.orange { color: var(--orange); }
+  .stat-card .value.gold { color: var(--gold); }
+  .stat-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* ─── Hash Animation ─────────────────── */
+  .hash-feed {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    margin-bottom: 32px; overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+  .hash-feed-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .hash-feed-header h3 { font-size: 14px; font-weight: 700; }
+  .hash-feed-header .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--orange); display: inline-block;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .hash-stream {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; color: var(--muted); line-height: 1.7;
+    max-height: 200px; overflow-y: auto;
+  }
+  .hash-stream .hash-line {
+    padding: 3px 8px; border-radius: 4px; transition: all 0.1s;
+  }
+  .hash-stream .hash-line.win {
+    background: rgba(255,215,0,0.15); color: var(--gold);
+    font-weight: 500; animation: flash-win 0.3s;
+  }
+  @keyframes flash-win {
+    0%, 100% { background: rgba(255,215,0,0.15); }
+    50% { background: rgba(255,215,0,0.4); }
+  }
+
+  /* ─── Odds Display ───────────────────── */
+  .odds-section {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 32px;
+  }
+  .odds-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    backdrop-filter: blur(8px);
+  }
+  .odds-card h4 {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 16px;
+  }
+  .odds-row {
+    display: flex; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .odds-row:last-child { border-bottom: none; }
+  .odds-row .odds-val { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--red); }
+
+  /* ─── How It Works ───────────────────── */
+  .how-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-bottom: 32px;
+  }
+  .how-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; text-align: center;
+  }
+  .how-card .num {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--orange), #e67e00);
+    color: #fff; font-weight: 800; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .how-card h4 { font-size: 15px; margin-bottom: 8px; }
+  .how-card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ─── Footer ─────────────────────────── */
+  .disclaimer {
+    text-align: center; padding: 32px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-top: 32px;
+  }
+  .disclaimer p { font-size: 13px; color: var(--muted); }
+
+  /* ─── Mobile ─────────────────────────── */
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .odds-section, .how-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 40px; }
+  }
+
+  /* ─── Block found overlay ────────────── */
+  .jackpot {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.9); align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+  }
+  .jackpot.show { display: flex; }
+  .jackpot h2 { font-size: 48px; font-weight: 900; color: var(--gold); }
+  .jackpot .amount { font-size: 72px; font-weight: 900; color: var(--orange); }
+  .jackpot button {
+    padding: 14px 36px; border-radius: 12px;
+    background: var(--gold); color: #000; font-weight: 800;
+    font-size: 16px; border: none; cursor: pointer; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HERO ═══════════════════════ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span> Solo Mining via Stratum
+  </div>
+  <h1>
+    <span class="lot">Long</span><span class="shot">Shot</span>
+  </h1>
+  <p>Treat Bitcoin mining like a lottery ticket. Your CPU runs SHA‑256 against the entire network. 99.99999% chance you earn nothing. But one lucky hash? <strong style="color:var(--gold)">3.125&nbsp;₿.</strong></p>
+
+  <div class="mine-btn-wrap">
+    <button class="mine-btn" id="mineBtn" onclick="toggleMining()">
+      <span class="icon">⛏</span> START MINING
+    </button>
+  </div>
+</section>
+
+<!-- ═══════════════ STATS ══════════════════════ -->
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card highlight">
+      <div class="label">Hashrate</div>
+      <div class="value orange" id="hashrate">—</div>
+      <div class="sub">SHA‑256d</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Hashes</div>
+      <div class="value" id="totalHashes" style="font-family:'DM Mono',monospace;font-size:24px">0</div>
+      <div class="sub">lottery tickets</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Session Time</div>
+      <div class="value" id="sessionTime" style="font-family:'DM Mono',monospace;font-size:24px">00:00</div>
+      <div class="sub">since start</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Power Cost</div>
+      <div class="value" id="powerCost" style="font-size:24px">$0.00</div>
+      <div class="sub">est. at $0.12/kWh</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ HASH FEED ═════════════════ -->
+  <div class="hash-feed">
+    <div class="hash-feed-header">
+      <h3>Live Hash Stream</h3>
+      <span><span class="live-dot"></span> <span style="color:var(--muted);font-size:12px">MINING</span></span>
+    </div>
+    <div class="hash-stream" id="hashStream">
+      <div class="hash-line" style="color:var(--muted)">Waiting for mining to start...</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ODDS ══════════════════════ -->
+  <div class="odds-section">
+    <div class="odds-card">
+      <h4>🎯 Your Odds</h4>
+      <div class="odds-row"><span>Per Block (10 min)</span><span class="odds-val" id="oddsBlock">—</span></div>
+      <div class="odds-row"><span>Per Day</span><span class="odds-val" id="oddsDay">—</span></div>
+      <div class="odds-row"><span>Per Week</span><span class="odds-val" id="oddsWeek">—</span></div>
+      <div class="odds-row"><span>Per Month</span><span class="odds-val" id="oddsMonth">—</span></div>
+      <div class="odds-row"><span>Per Year</span><span class="odds-val" id="oddsYear">—</span></div>
+    </div>
+    <div class="odds-card">
+      <h4>🏆 The Prize</h4>
+      <div class="odds-row"><span>Block Reward</span><span style="color:var(--orange);font-weight:700">3.125 ₿</span></div>
+      <div class="odds-row"><span>USD Value</span><span id="btcPrice" style="font-weight:700">—</span></div>
+      <div class="odds-row"><span>Network Hashrate</span><span style="color:var(--muted)">~650 EH/s</span></div>
+      <div class="odds-row"><span>Your Share</span><span id="networkShare" style="color:var(--muted)">—</span></div>
+      <div class="odds-row"><span>Pool</span><span style="color:var(--green)">ckpool solo</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+  <h3 style="text-align:center;margin-bottom:24px;font-size:22px;font-weight:800">How It Works</h3>
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="num">1</div>
+      <h4>Start the Miner</h4>
+      <p>Click the button. LongShot connects to a public solo mining pool via the Stratum protocol — the same protocol ASIC miners use.</p>
+    </div>
+    <div class="how-card">
+      <div class="num">2</div>
+      <h4>Hash Away</h4>
+      <p>Your CPU computes SHA‑256d hashes. Each one is a lottery ticket. Most will be worthless — your computer is 10 million times slower than a mining rig.</p>
+    </div>
+    <div class="how-card">
+      <div class="num">3</div>
+      <h4>Beat the Odds</h4>
+      <p>One in several trillion chance per block. But if lightning strikes and your hash solves the block? You collect the full 3.125 BTC reward. All or nothing.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DISCLAIMER ════════════════ -->
+  <div class="disclaimer">
+    <p><strong>This is a demo.</strong> Real mining requires connecting to a Bitcoin node or Stratum pool. The hash stream shown here is simulated. The odds calculations are real — based on actual network difficulty. LongShot is a Python CLI tool you can run on your own machine. Zero dependencies. Pure stdlib.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ JACKPOT OVERLAY ═══════════════ -->
+<div class="jackpot" id="jackpot" onclick="closeJackpot()">
+  <h2>🎉 BLOCK FOUND!</h2>
+  <div class="amount">3.125 ₿</div>
+  <p style="color:var(--muted)">Just kidding. This would require winning the lottery<br>several trillion times in a row. But you get the idea.</p>
+  <button onclick="closeJackpot()">Keep Mining</button>
+</div>
+
+<script>
+// ── State ──────────────────────────────────
+let mining = false;
+let totalHashes = 0;
+let startTime = null;
+let timer = null;
+let hashrate = 0;
+let hashStreamEl;
+const hashrateEstimate = 12_000_000; // ~12 MH/s typical MacBook
+const btcPrice = 105000; // fake current price
+const kWhRate = 0.12;
+const wattsEstimate = 35;
+
+// ── Formatting ────────────────────────────
+function fmtHashrate(h) {
+  if (h < 1000) return h.toFixed(0) + ' H/s';
+  if (h < 1e6) return (h/1e3).toFixed(1) + ' KH/s';
+  if (h < 1e9) return (h/1e6).toFixed(1) + ' MH/s';
+  if (h < 1e12) return (h/1e9).toFixed(1) + ' GH/s';
+  return (h/1e12).toFixed(1) + ' TH/s';
+}
+
+function fmtNumber(n) {
+  if (n < 1000) return n.toFixed(0);
+  if (n < 1e6) return (n/1e3).toFixed(1) + 'K';
+  if (n < 1e9) return (n/1e6).toFixed(1) + 'M';
+  if (n < 1e12) return (n/1e9).toFixed(1) + 'B';
+  return (n/1e12).toFixed(1) + 'T';
+}
+
+function fmtOdds(prob) {
+  if (prob <= 0) return '∞';
+  const oneIn = 1 / prob;
+  if (oneIn < 1000) return '1 in ' + oneIn.toFixed(0);
+  if (oneIn < 1e6) return '1 in ' + (oneIn/1e3).toFixed(0) + 'K';
+  if (oneIn < 1e9) return '1 in ' + (oneIn/1e6).toFixed(0) + 'M';
+  if (oneIn < 1e12) return '1 in ' + (oneIn/1e9).toFixed(0) + 'B';
+  return '1 in ' + (oneIn/1e12).toFixed(0) + 'T';
+}
+
+function fmtTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = Math.floor(secs % 60);
+  if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}m`;
+  return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+// ── Odds calc ─────────────────────────────
+function calcOdds(hr) {
+  const difficulty = 85e12;
+  const maxTarget = BigInt('0x' + 'f'*64);
+  const target = maxTarget / BigInt(Math.floor(difficulty));
+  const probPerHash = Number(target) / Number(maxTarget);
+  const hashesPerBlock = hr * 600;
+  const blockProb = 1 - Math.pow(1 - probPerHash, hashesPerBlock);
+  return {
+    block: blockProb,
+    day: 1 - Math.pow(1 - blockProb, 144),
+    week: 1 - Math.pow(1 - blockProb, 144 * 7),
+    month: 1 - Math.pow(1 - blockProb, 144 * 30),
+    year: 1 - Math.pow(1 - blockProb, 144 * 365)
+  };
+}
+
+// ── Random hash ───────────────────────────
+function randomHash() {
+  let h = '';
+  for (let i = 0; i < 64; i++) h += '0123456789abcdef'[Math.floor(Math.random() * 16)];
+  return h;
+}
+
+// ── Generate hash line ────────────────────
+function makeHashLine() {
+  const hash = randomHash();
+  // Simulate "near miss" — 1 in ~500K chance for visual effect
+  const nearMiss = Math.random() < 0.000002;
+  // Actual "win" — 1 in ~50M for demo (so you might see it eventually)
+  const isWin = Math.random() < 0.00000002;
+
+  if (isWin) return { hash, cls: 'win', text: '🎉 WIN!' };
+  if (nearMiss) {
+    const zeros = hash.match(/^0+/);
+    const zc = zeros ? zeros[0].length : 1;
+    return { hash, cls: '', text: `${zc} leading zeros` };
+  }
+  return { hash, cls: '', text: null };
+}
+
+// ── Update dashboard ──────────────────────
+function updateDashboard() {
+  const elapsed = (Date.now() - startTime) / 1000;
+  const newHashes = Math.floor(elapsed * hashrateEstimate);
+  totalHashes = newHashes;
+
+  // Update stats
+  document.getElementById('hashrate').textContent = fmtHashrate(hashrateEstimate);
+  document.getElementById('totalHashes').textContent = fmtNumber(totalHashes);
+  document.getElementById('sessionTime').textContent = fmtTime(elapsed);
+
+  const kwhUsed = (wattsEstimate / 1000) * (elapsed / 3600);
+  const cost = kwhUsed * kWhRate;
+  document.getElementById('powerCost').textContent = '$' + cost.toFixed(3);
+
+  // Odds
+  const odds = calcOdds(hashrateEstimate);
+  document.getElementById('oddsBlock').textContent = fmtOdds(odds.block);
+  document.getElementById('oddsDay').textContent = fmtOdds(odds.day);
+  document.getElementById('oddsWeek').textContent = fmtOdds(odds.week);
+  document.getElementById('oddsMonth').textContent = fmtOdds(odds.month);
+  document.getElementById('oddsYear').textContent = fmtOdds(odds.year);
+
+  // Prize
+  document.getElementById('btcPrice').textContent = '$' + (3.125 * btcPrice).toLocaleString();
+  const netShare = (hashrateEstimate / 650e18) * 100;
+  document.getElementById('networkShare').textContent = netShare.toExponential(2) + '% of network';
+}
+
+// ── Add hash to stream ────────────────────
+function addHashToStream() {
+  const hl = makeHashLine();
+  const div = document.createElement('div');
+  div.className = 'hash-line' + (hl.cls ? ' ' + hl.cls : '');
+  const prefix = hl.hash.substring(0, 8);
+  const rest = hl.hash.substring(8);
+  div.innerHTML = `<span style="color:#444;font-size:10px;margin-right:8px">[${new Date().toLocaleTimeString()}]</span><span style="color:#555">${prefix}</span><span style="color:#333">${rest}</span>${hl.text ? ' <span style="color:var(--gold);margin-left:8px">' + hl.text + '</span>' : ''}`;
+
+  const stream = document.getElementById('hashStream');
+  stream.appendChild(div);
+  stream.scrollTop = stream.scrollHeight;
+
+  // Keep only last 100 lines
+  while (stream.children.length > 100) stream.removeChild(stream.firstChild);
+
+  // Jackpot!
+  if (hl.cls === 'win') {
+    document.getElementById('jackpot').classList.add('show');
+  }
+}
+
+// ── Toggle mining ─────────────────────────
+function toggleMining() {
+  if (mining) {
+    stopMining();
+  } else {
+    startMining();
+  }
+}
+
+function startMining() {
+  mining = true;
+  startTime = Date.now();
+  totalHashes = 0;
+
+  const btn = document.getElementById('mineBtn');
+  btn.innerHTML = '<span class="icon">⏸</span> STOP MINING';
+  btn.classList.add('running');
+
+  // Clear stream
+  const stream = document.getElementById('hashStream');
+  stream.innerHTML = '';
+
+  // Start update loops
+  timer = setInterval(() => {
+    updateDashboard();
+    // Add hashes to stream
+    for (let i = 0; i < 2; i++) addHashToStream();
+  }, 500);
+
+  updateDashboard();
+}
+
+function stopMining() {
+  mining = false;
+  clearInterval(timer);
+  const btn = document.getElementById('mineBtn');
+  btn.innerHTML = '<span class="icon">⛏</span> START MINING';
+  btn.classList.remove('running');
+  updateDashboard();
+}
+
+function closeJackpot() {
+  document.getElementById('jackpot').classList.remove('show');
+}
+
+// ── Init ──────────────────────────────────
+document.getElementById('btcPrice').textContent = '$' + (3.125 * btcPrice).toLocaleString();
+</script>
+
+</body>
+</html>
