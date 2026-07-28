@@ -328,14 +328,21 @@ def pad_visible(text, width, align='left'):
         return ' ' * padding + text
     return text + ' ' * padding
 
-def draw_card_row(left_title, left_val, left_sub, right_title, right_val, right_sub, left_color=ORANGE, w=26):
-    """Draw a row of two stat cards with perfect alignment."""
-    top = f"  {ORANGE}┌{'─' * w}┐  ┌{'─' * w}┐{RST}"
-    t1 = f"  {ORANGE}│{RST} {GRAY}{pad_visible(left_title, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {GRAY}{pad_visible(right_title, w-2)}{RST}{ORANGE}│{RST}"
-    v1 = f"  {ORANGE}│{RST} {left_color}{BLD}{pad_visible(left_val, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {WHT}{pad_visible(right_val, w-2)}{RST}{ORANGE}│{RST}"
-    s1 = f"  {ORANGE}│{RST} {DIM}{pad_visible(left_sub, w-2)}{RST}{ORANGE}│{RST}  {ORANGE}│{RST} {DIM}{pad_visible(right_sub, w-2)}{RST}{ORANGE}│{RST}"
-    bot = f"  {ORANGE}└{'─' * w}┘  └{'─' * w}┘{RST}"
-    return f"\n{top}\n{t1}\n{v1}\n{s1}\n{bot}"
+def draw_full_box(title, lines, w=58):
+    """Draw a full-width box with title and content lines, ANSI-safe."""
+    out = [f"\n  {ORANGE}┌{'─' * w}┐{RST}"]
+    out.append(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}{title}{RST}', w-2)} {ORANGE}│{RST}")
+    out.append(f"  {ORANGE}├{'─' * w}┤{RST}")
+    for line in lines:
+        out.append(f"  {ORANGE}│{RST} {pad_visible(line, w-2)} {ORANGE}│{RST}")
+    out.append(f"  {ORANGE}└{'─' * w}┘{RST}")
+    return "\n".join(out)
+
+def draw_odds_row(label, odds_val, label2, val2, w=26):
+    """Single row in the odds/prize cards."""
+    left = f"  {ORANGE}│{RST} {DIM}{pad_visible(label, 10)}{RST} {RED}{pad_visible(odds_val, 14, 'right')}{RST}{ORANGE}│{RST}"
+    right = f"  {ORANGE}│{RST} {DIM}{pad_visible(label2, 12)}{RST} {pad_visible(val2, 12, 'right')}{RST}{ORANGE}│{RST}"
+    return f"{left}  {right}"
 
 def print_dashboard(client, elapsed, btc_price=None):
     clear()
@@ -361,30 +368,32 @@ def print_dashboard(client, elapsed, btc_price=None):
     time_str = str(timedelta(seconds=int(elapsed)))
     cost_str = f"${power_cost:.4f}"
     
-    print(draw_card_row("HASHRATE", hr_str, "SHA-256d on CPU",
-                        "TOTAL HASHES", hashes_str, "lottery tickets",
-                        left_color=ORANGE))
-    print(draw_card_row("SESSION TIME", time_str, "since start",
-                        "POWER COST", cost_str, "est. at $0.12/kWh",
-                        left_color=WHT))
+    # Row 1: Hashrate + Total Hashes
+    print(f"\n  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}HASHRATE{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}TOTAL HASHES{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{ORANGE}{BLD}{hr_str}{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{hashes_str}{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}SHA-256d on CPU{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}lottery tickets{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
+    # Row 2: Session Time + Power Cost
+    print(f"  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}SESSION TIME{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}POWER COST{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{WHT}{time_str}{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{cost_str}{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}since start{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}est. at $0.12/kWh{RST}', 24)} {ORANGE}│{RST}")
+    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
 
     # ═══ LIVE HASH STREAM ═══
     recent_hashes = getattr(client, 'recent_hashes', [])
-    print(f"""
-  {ORANGE}┌{'─' * 56}┐{RST}
-  {ORANGE}│{RST} {BLD}LIVE HASH STREAM{RST} {DIM}(last 8 hashes){RST}                          {ORANGE}│{RST}
-  {ORANGE}├{'─' * 56}┤{RST}""")
-    
+    hash_lines = []
     if recent_hashes:
         for h in recent_hashes[-8:]:
             prefix = h[:10]
             rest = h[10:18]
             ts = datetime.now().strftime("%H:%M:%S")
-            print(f"  {ORANGE}│{RST} {DIM}[{ts}]{RST} {GRAY}{prefix}{RST}{DIM}{rest}...{RST}{' ' * 18}{ORANGE}│{RST}")
+            hash_lines.append(f"{DIM}[{ts}]{RST} {GRAY}{prefix}{RST}{DIM}{rest}...{RST}")
     else:
-        print(f"  {ORANGE}│{RST} {DIM}Waiting for hashes...{RST}                              {ORANGE}│{RST}")
+        hash_lines.append(f"{DIM}Waiting for hashes...{RST}")
     
-    print(f"  {ORANGE}└{'─' * 56}┘{RST}")
+    print(draw_full_box("LIVE HASH STREAM (last 8 hashes)", hash_lines))
 
     # ═══ ODDS + PRIZE (2-column) ═══
     weekly_odds_val = 1 - (1 - odds) ** (144 * 7)
@@ -392,26 +401,24 @@ def print_dashboard(client, elapsed, btc_price=None):
     yearly_odds_val = 1 - (1 - odds) ** (144 * 365)
     net_share = (hr / 650_000_000_000_000_000_000) * 100
     
-    print(f"""
-  {ORANGE}┌{'─' * 26}┐  ┌{'─' * 26}┐{RST}
-  {ORANGE}│{RST} {BLD}🎯 YOUR ODDS{RST}              {ORANGE}│{RST}  {ORANGE}│{RST} {BLD}🏆 THE PRIZE{RST}            {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Per Block{RST}  {RED}{format_odds(odds):>14}{RST} {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}Block Reward{RST}  {GOLD}{BITCOIN_REWARD} ₿{RST}    {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Per Day{RST}    {RED}{format_odds(daily_odds):>14}{RST} {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}USD Value{RST}   {WHT}${btc_value:>10,.0f}{RST}  {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Per Week{RST}   {RED}{format_odds(weekly_odds_val):>14}{RST} {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}Network HR{RST}  {GRAY}~650 EH/s{RST}      {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Per Month{RST}  {RED}{format_odds(monthly_odds_val):>14}{RST} {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}Your Share{RST}  {GRAY}{net_share:.2e}%{RST}      {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Per Year{RST}   {RED}{format_odds(yearly_odds_val):>14}{RST} {ORANGE}│{RST}  {ORANGE}│{RST} {DIM}Pool{RST}       {GRN}{client.host}{RST}       {ORANGE}│{RST}
-  {ORANGE}└{'─' * 26}┘  └{'─' * 26}┘{RST}""")
+    print(f"\n  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
+    print(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}🎯 YOUR ODDS{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{BLD}🏆 THE PRIZE{RST}', 24)} {ORANGE}│{RST}")
+    print(draw_odds_row("Per Block", format_odds(odds), "Block Reward", f"{GOLD}{BITCOIN_REWARD} ₿{RST}"))
+    print(draw_odds_row("Per Day", format_odds(daily_odds), "USD Value", f"{WHT}${btc_value:,.0f}{RST}"))
+    print(draw_odds_row("Per Week", format_odds(weekly_odds_val), "Network HR", f"{GRAY}~650 EH/s{RST}"))
+    print(draw_odds_row("Per Month", format_odds(monthly_odds_val), "Your Share", f"{GRAY}{net_share:.2e}%{RST}"))
+    print(draw_odds_row("Per Year", format_odds(yearly_odds_val), "Pool", f"{GRN}{client.host}{RST}"))
+    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
 
     # ═══ ELECTRICITY ═══
     monthly_cost = daily_cost * 30
     yearly_cost = daily_cost * 365
     ev = yearly_odds_val * btc_value
-    print(f"""
-  {ORANGE}┌{'─' * 56}┐{RST}
-  {ORANGE}│{RST} {BLD}💰 ELECTRICITY{RST}                                          {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Daily: ~${daily_cost:.2f}  │  Monthly: ~${monthly_cost:.2f}  │  Yearly: ~${yearly_cost:.0f}{RST}          {ORANGE}│{RST}
-  {ORANGE}│{RST} {DIM}Expected yearly value: ${ev:.6f}  (spoiler: it's less than the power bill){RST} {ORANGE}│{RST}
-  {ORANGE}└{'─' * 56}┘{RST}""")
+    elec_lines = [
+        f"{DIM}Daily: ~${daily_cost:.2f}  │  Monthly: ~${monthly_cost:.2f}  │  Yearly: ~${yearly_cost:.0f}{RST}",
+        f"{DIM}Expected yearly value: ${ev:.6f}  (spoiler: it costs more than you'll win){RST}"
+    ]
+    print(draw_full_box("💰 ELECTRICITY", elec_lines))
 
     # ═══ FOOTER ═══
     print(f"""
