@@ -98,12 +98,43 @@ class StratumClient:
             return False
         self.extranonce1 = resp["result"][1]
         self.extranonce2_size = resp["result"][2]
+        # Server immediately sends set_difficulty + first notify after subscribe.
+        # Consume them so they don't interfere with the authorize response.
+        self.sock.settimeout(2)
+        try:
+            while True:
+                line = recv_line(self.sock)
+                if not line:
+                    break
+                data = json.loads(line)
+                if data.get("method") == "mining.notify":
+                    # Store first job
+                    params = data["params"]
+                    self.job = {
+                        "job_id": params[0], "prevhash": params[1],
+                        "coinb1": params[2], "coinb2": params[3],
+                        "merkle_branches": params[4], "version": params[5],
+                        "nbits": params[6], "ntime": params[7],
+                        "clean_jobs": params[8] if len(params) > 8 else True
+                    }
+                    break
+        except (socket.timeout, json.JSONDecodeError):
+            pass
+        finally:
+            self.sock.settimeout(None)
         return True
 
     def authorize(self):
         self.sock.sendall(jsonrpc("mining.authorize", [self.username, self.password]).encode())
         resp = json.loads(recv_line(self.sock))
-        return resp.get("result") == True
+        # ckpool returns result=True on success, some pools return error=None
+        if resp.get("result") == True:
+            return True
+        if resp.get("error") is None and resp.get("result") is not False:
+            return True
+        # Debug
+        sys.stderr.write(f"\n  {YELLOW}Auth response: {json.dumps(resp)}{RST}\n")
+        return False
 
     def get_job(self):
         """Wait for and parse a mining job."""
