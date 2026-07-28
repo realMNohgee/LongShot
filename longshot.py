@@ -311,7 +311,9 @@ def format_odds(prob):
         return f"1 in {one_in/1_000_000_000_000:.0f}T"
 
 
-# ── Terminal UI (matches web demo layout) ──────────────────────
+# ── Terminal UI (in-place refresh, no flicker) ─────────────────
+_dashboard_lines = 0
+
 def clear():
     print("\033[2J\033[H", end="")
 
@@ -344,8 +346,13 @@ def draw_odds_row(label, odds_val, label2, val2):
     right = f"  {ORANGE}│{RST} {DIM}{pad_visible(label2, 13)}{RST}{pad_visible(val2, 13, 'right')}{RST} {ORANGE}│{RST}"
     return f"{left} {right}"
 
-def print_dashboard(client, elapsed, btc_price=None):
-    clear()
+def print_dashboard(client, elapsed, first=False, btc_price=None):
+    global _dashboard_lines
+    
+    if first:
+        clear()
+        _dashboard_lines = 0
+    
     hr = client.avg_hashrate()
     odds = odds_per_block(hr) if hr > 0 else 0
     daily_odds = 1 - (1 - odds) ** 144
@@ -354,6 +361,13 @@ def print_dashboard(client, elapsed, btc_price=None):
     kwh_used = (35 / 1000) * (elapsed / 3600)
     power_cost = kwh_used * 0.12
     daily_cost = 0.035 * 24 * 0.12
+    
+    # On refresh, jump back to saved position and redraw over old content
+    if not first:
+        sys.stdout.write("\033[u")  # Restore cursor to saved position
+        sys.stdout.flush()
+    sys.stdout.write("\033[s")  # Save position for next refresh
+    sys.stdout.flush()
     
     # ═══ HEADER ═══
     print(f"""
@@ -429,6 +443,10 @@ def print_dashboard(client, elapsed, btc_price=None):
     print(f"""
   {DIM}Each hash = a lottery ticket. 99.99999% nothing. But 3.125 ₿ if we hit.{RST}
   {DIM}Ctrl+C to stop.{RST}""")
+    
+    # Clear anything below (old content that may be longer) and hide cursor
+    sys.stdout.write("\033[J\033[?25l")
+    sys.stdout.flush()
 
 
 # ── CLI entry ─────────────────────────────────────────────────
@@ -523,6 +541,7 @@ def run_miner(pool_host=None, pool_port=None):
     dashboard_interval = 3  # seconds
     last_dashboard = 0
     dot_count = 0
+    first_draw = True
 
     try:
         while miner_thread.is_alive():
@@ -537,7 +556,8 @@ def run_miner(pool_host=None, pool_port=None):
 
             # Dashboard update
             if time.time() - last_dashboard >= dashboard_interval:
-                print_dashboard(client, elapsed)
+                print_dashboard(client, elapsed, first=first_draw)
+                first_draw = False
                 last_dashboard = time.time()
 
             # Check for result
@@ -545,6 +565,7 @@ def run_miner(pool_host=None, pool_port=None):
                 break
 
     except KeyboardInterrupt:
+        sys.stdout.write("\033[?25h")  # Show cursor
         print(f"\n\n  {GOLD}⏹ Mining stopped.{RST}")
     finally:
         client.stop()
