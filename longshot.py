@@ -362,91 +362,115 @@ def print_dashboard(client, elapsed, first=False, btc_price=None):
     power_cost = kwh_used * 0.12
     daily_cost = 0.035 * 24 * 0.12
     
-    # On refresh, jump back to saved position and redraw over old content
-    if not first:
-        sys.stdout.write("\033[u")  # Restore cursor to saved position
-        sys.stdout.flush()
-    sys.stdout.write("\033[s")  # Save position for next refresh
-    sys.stdout.flush()
+    # Build entire dashboard in a buffer to count lines
+    buf = []
+    p = lambda s: buf.append(s)
     
     # ═══ HEADER ═══
-    print(f"""
-{ORANGE}╔{'═' * 58}╗
-║{RST}         {BLD}🎰  LONGSHOT{RST} — Bitcoin Lottery Miner        {ORANGE}║
-║{RST}           {DIM}Solo mining. All or nothing.{RST}                  {ORANGE}║
-╚{'═' * 58}╝{RST}""")
+    p(f"\n{ORANGE}╔{'═' * 58}╗")
+    p(f"{ORANGE}║{RST}         {BLD}🎰  LONGSHOT{RST} — Bitcoin Lottery Miner        {ORANGE}║")
+    p(f"{ORANGE}║{RST}           {DIM}Solo mining. All or nothing.{RST}                  {ORANGE}║")
+    p(f"{ORANGE}╚{'═' * 58}╝{RST}")
 
-    # ═══ STATS GRID (4 cards) ═══
+    # ═══ STATS GRID ═══
     hr_str = format_hashrate(hr)
     hashes_str = f"{client.submitted:,}"
     time_str = str(timedelta(seconds=int(elapsed)))
     cost_str = f"${power_cost:.4f}"
     
-    # Row 1: Hashrate + Total Hashes
-    print(f"\n  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}HASHRATE{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}TOTAL HASHES{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{ORANGE}{BLD}{hr_str}{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{hashes_str}{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}SHA-256d on CPU{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}lottery tickets{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
-    # Row 2: Session Time + Power Cost
-    print(f"  {ORANGE}┌{'─'*26}┐  ┌{'─'*26}┐{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}SESSION TIME{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}POWER COST{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{WHT}{time_str}{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{cost_str}{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}since start{RST}', 24)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}est. at $0.12/kWh{RST}', 24)} {ORANGE}│{RST}")
-    print(f"  {ORANGE}└{'─'*26}┘  └{'─'*26}┘{RST}")
+    w = 26
+    p(f"\n  {ORANGE}┌{'─'*w}┐  ┌{'─'*w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}HASHRATE{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}TOTAL HASHES{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{ORANGE}{BLD}{hr_str}{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{hashes_str}{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}SHA-256d on CPU{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}lottery tickets{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─'*w}┘  └{'─'*w}┘{RST}")
+    p(f"  {ORANGE}┌{'─'*w}┐  ┌{'─'*w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{GRAY}SESSION TIME{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{GRAY}POWER COST{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{WHT}{time_str}{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{WHT}{cost_str}{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{DIM}since start{RST}', w-2)} {ORANGE}│{RST}  {ORANGE}│{RST} {pad_visible(f'{DIM}est. at $0.12/kWh{RST}', w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─'*w}┘  └{'─'*w}┘{RST}")
 
     # ═══ LIVE HASH STREAM ═══
     recent_hashes = getattr(client, 'recent_hashes', [])
     hash_lines = []
     if recent_hashes:
         for h in recent_hashes[-8:]:
-            prefix = h[:10]
-            rest = h[10:18]
-            ts = datetime.now().strftime("%H:%M:%S")
-            hash_lines.append(f"{DIM}[{ts}]{RST} {GRAY}{prefix}{RST}{DIM}{rest}...{RST}")
+            hash_lines.append(f"{DIM}[{datetime.now().strftime('%H:%M:%S')}]{RST} {GRAY}{h[:10]}{RST}{DIM}{h[10:18]}...{RST}")
     else:
         hash_lines.append(f"{DIM}Waiting for hashes...{RST}")
     
-    print(draw_full_box("LIVE HASH STREAM (last 8 hashes)", hash_lines))
+    box_w = 58
+    p(f"\n  {ORANGE}┌{'─' * box_w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}LIVE HASH STREAM (last 8 hashes){RST}', box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}├{'─' * box_w}┤{RST}")
+    for line in hash_lines:
+        p(f"  {ORANGE}│{RST} {pad_visible(line, box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─' * box_w}┘{RST}")
 
-    # ═══ ODDS + PRIZE (stacked vertically — no alignment issues) ═══
+    # ═══ ODDS ═══
     weekly_odds_val = 1 - (1 - odds) ** (144 * 7)
     monthly_odds_val = 1 - (1 - odds) ** (144 * 30)
     yearly_odds_val = 1 - (1 - odds) ** (144 * 365)
-    net_share = (hr / 650_000_000_000_000_000_000) * 100
     
-    odds_lines = [
+    odds_rows = [
         f"{DIM}Per Block:{RST}   {RED}{format_odds(odds)}{RST}      {DIM}Per Day:{RST}   {RED}{format_odds(daily_odds)}{RST}",
         f"{DIM}Per Week:{RST}    {RED}{format_odds(weekly_odds_val)}{RST}      {DIM}Per Month:{RST}  {RED}{format_odds(monthly_odds_val)}{RST}",
         f"{DIM}Per Year:{RST}    {RED}{format_odds(yearly_odds_val)}{RST}",
     ]
-    print(draw_full_box("🎯 YOUR ODDS", odds_lines))
-    
-    prize_lines = [
+    p(f"\n  {ORANGE}┌{'─' * box_w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}🎯 YOUR ODDS{RST}', box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}├{'─' * box_w}┤{RST}")
+    for row in odds_rows:
+        p(f"  {ORANGE}│{RST} {pad_visible(row, box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─' * box_w}┘{RST}")
+
+    # ═══ PRIZE ═══
+    net_share = (hr / 650_000_000_000_000_000_000) * 100
+    prize_rows = [
         f"{DIM}Block Reward:{RST}  {GOLD}{BITCOIN_REWARD} ₿{RST}     {DIM}USD Value:{RST}  {WHT}${btc_value:,.0f}{RST}",
         f"{DIM}Network HR:{RST}    {GRAY}~650 EH/s{RST}       {DIM}Your Share:{RST}  {GRAY}{net_share:.2e}%{RST}",
         f"{DIM}Pool:{RST}          {GRN}{client.host}{RST}",
     ]
-    print(draw_full_box("🏆 THE PRIZE", prize_lines))
+    p(f"\n  {ORANGE}┌{'─' * box_w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}🏆 THE PRIZE{RST}', box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}├{'─' * box_w}┤{RST}")
+    for row in prize_rows:
+        p(f"  {ORANGE}│{RST} {pad_visible(row, box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─' * box_w}┘{RST}")
 
     # ═══ ELECTRICITY ═══
     monthly_cost = daily_cost * 30
     yearly_cost = daily_cost * 365
     ev = yearly_odds_val * btc_value
-    elec_lines = [
+    elec_rows = [
         f"{DIM}Daily: ~${daily_cost:.2f}  │  Monthly: ~${monthly_cost:.2f}  │  Yearly: ~${yearly_cost:.0f}{RST}",
         f"{DIM}Expected yearly value: ${ev:.6f}  (spoiler: it costs more than you'll win){RST}"
     ]
-    print(draw_full_box("💰 ELECTRICITY", elec_lines))
+    p(f"\n  {ORANGE}┌{'─' * box_w}┐{RST}")
+    p(f"  {ORANGE}│{RST} {pad_visible(f'{BLD}💰 ELECTRICITY{RST}', box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}├{'─' * box_w}┤{RST}")
+    for row in elec_rows:
+        p(f"  {ORANGE}│{RST} {pad_visible(row, box_w-2)} {ORANGE}│{RST}")
+    p(f"  {ORANGE}└{'─' * box_w}┘{RST}")
 
     # ═══ FOOTER ═══
-    print(f"""
-  {DIM}Each hash = a lottery ticket. 99.99999% nothing. But 3.125 ₿ if we hit.{RST}
-  {DIM}Ctrl+C to stop.{RST}""")
+    p(f"\n  {DIM}Each hash = a lottery ticket. 99.99999% nothing. But 3.125 ₿ if we hit.{RST}")
+    p(f"  {DIM}Ctrl+C to stop.{RST}")
+
+    # ── Output: jump back on refresh, then print ──
+    if not first and _dashboard_lines > 0:
+        sys.stdout.write(f"\033[{_dashboard_lines}A")
+        sys.stdout.flush()
     
-    # Clear anything below (old content that may be longer) and hide cursor
+    output = "\n".join(buf)
+    print(output)
+    
+    # Clear trailing content and hide cursor
     sys.stdout.write("\033[J\033[?25l")
     sys.stdout.flush()
+    
+    # Remember line count for next refresh
+    _dashboard_lines = len(buf)
 
 
 # ── CLI entry ─────────────────────────────────────────────────
