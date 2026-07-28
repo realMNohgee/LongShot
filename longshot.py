@@ -347,11 +347,7 @@ def draw_odds_row(label, odds_val, label2, val2):
     return f"{left} {right}"
 
 def print_dashboard(client, elapsed, first=False, btc_price=None):
-    global _dashboard_lines
-    
-    if first:
-        clear()
-        _dashboard_lines = 0
+    clear()
     
     hr = client.avg_hashrate()
     odds = odds_per_block(hr) if hr > 0 else 0
@@ -457,20 +453,10 @@ def print_dashboard(client, elapsed, first=False, btc_price=None):
     p(f"\n  {DIM}Each hash = a lottery ticket. 99.99999% nothing. But 3.125 ₿ if we hit.{RST}")
     p(f"  {DIM}Ctrl+C to stop.{RST}")
 
-    # ── Output: jump back on refresh, then print ──
-    if not first and _dashboard_lines > 0:
-        sys.stdout.write(f"\033[{_dashboard_lines}A")
-        sys.stdout.flush()
-    
-    output = "\n".join(buf)
-    print(output)
-    
-    # Clear trailing content and hide cursor
-    sys.stdout.write("\033[J\033[?25l")
+    # Print and hide cursor
+    print("\n".join(buf))
+    sys.stdout.write("\033[?25l")
     sys.stdout.flush()
-    
-    # Remember line count for next refresh
-    _dashboard_lines = len(buf)
 
 
 # ── CLI entry ─────────────────────────────────────────────────
