@@ -488,8 +488,8 @@ def print_help():
 """)
 
 
-def run_miner(pool_host=None, pool_port=None):
-    """Main mining function."""
+def run_miner(pool_host=None, pool_port=None, duration=None):
+    """Main mining function. If duration is set (minutes), auto-stop after that time."""
     if not pool_host:
         # Try pools in order
         for host, port in SOLO_POOLS:
@@ -529,6 +529,8 @@ def run_miner(pool_host=None, pool_port=None):
             return
 
     print(f"  {GRN}Mining started!{RST}")
+    if duration:
+        print(f"  {DIM}Auto-stop in {duration} minutes.{RST}")
     print(f"  {DIM}Each dot = ~500K hashes. Press Ctrl+C to stop.{RST}")
     print(f"  {GRN}☕ Caffeinated — your Mac won't sleep while mining.{RST}\n")
 
@@ -557,6 +559,11 @@ def run_miner(pool_host=None, pool_port=None):
         while miner_thread.is_alive():
             time.sleep(0.5)
             elapsed = time.time() - client.start_time if client.start_time else 0
+
+            # Duration timeout
+            if duration and elapsed >= duration * 60:
+                print(f"\n  {GOLD}⏰ {duration} minutes elapsed — auto-stopping.{RST}")
+                break
 
             # Print dots for activity
             if client.submitted - dot_count >= 1_000_000:
@@ -654,9 +661,14 @@ def main():
         print_help()
     elif cmd == 'mine':
         print_banner()
-        pool_host = sys.argv[2] if len(sys.argv) > 2 else None
-        pool_port = int(sys.argv[3]) if len(sys.argv) > 3 else None
-        run_miner(pool_host, pool_port)
+        pool_host = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith('--') else None
+        pool_port = int(sys.argv[3]) if len(sys.argv) > 3 and not sys.argv[3].startswith('--') else None
+        # Check for --duration flag (in minutes)
+        duration = None
+        for i, arg in enumerate(sys.argv):
+            if arg == '--duration' and i + 1 < len(sys.argv):
+                duration = int(sys.argv[i + 1])
+        run_miner(pool_host, pool_port, duration=duration)
     elif cmd == 'odds':
         print_banner()
         cmd_odds()
