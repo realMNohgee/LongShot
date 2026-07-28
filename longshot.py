@@ -67,7 +67,7 @@ def recv_line(sock):
             return buf.decode().strip()
 
 class StratumClient:
-    def __init__(self, host, port, username="1LongShotDemoBTCAddress111111111", password="x"):
+    def __init__(self, host, port, username="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", password="x"):
         self.host = host
         self.port = port
         self.username = username
